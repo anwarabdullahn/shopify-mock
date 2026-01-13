@@ -83,7 +83,21 @@ This starts PostgreSQL on port **5433** and the mock service on port **3100**.
 
 ## Running
 
-### Development
+### Development (Recommended)
+
+**Step 1: Start PostgreSQL only**
+
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+**Step 2: Install dependencies**
+
+```bash
+npm install
+```
+
+**Step 3: Run app locally**
 
 ```bash
 npm run dev
@@ -91,12 +105,15 @@ npm run dev
 
 Service will be available at `http://localhost:3100`
 
-### Production
+### Production (Docker)
 
 ```bash
+npm install
 npm run build
-npm start
+docker-compose up -d
 ```
+
+This builds and runs both PostgreSQL and the service in containers.
 
 ## API Endpoints
 
