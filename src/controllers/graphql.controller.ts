@@ -95,12 +95,12 @@ Supported mutations:
       }
 
       throw new BadRequestException('Invalid GraphQL query');
-    } catch (error) {
+    } catch (error: any) {
       return {
         data: null,
         errors: [
           {
-            message: error.message,
+            message: error?.message || 'Unknown error',
           },
         ],
       };
