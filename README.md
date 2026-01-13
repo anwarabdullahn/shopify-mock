@@ -42,10 +42,23 @@ Key environment variables:
 
 ### Database Setup
 
+**Note:** Shopify Mock uses PostgreSQL port **5433** to avoid conflicts with the main backend service (port 5432).
+
+#### Option 1: Local Development (without Docker)
+
 Create PostgreSQL database:
 
 ```bash
 createdb shopify_mock
+```
+
+Update `.env`:
+```
+DB_HOST=localhost
+DB_PORT=5433
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_NAME=shopify_mock
 ```
 
 Run migrations:
@@ -59,6 +72,14 @@ Seed test data:
 ```bash
 npm run seed
 ```
+
+#### Option 2: Docker Compose
+
+```bash
+docker-compose up
+```
+
+This starts PostgreSQL on port **5433** and the mock service on port **3100**.
 
 ## Running
 

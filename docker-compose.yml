@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: shopify_mock
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,6 +17,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - shopify-mock-network
 
   shopify-mock:
     build:
@@ -41,6 +43,12 @@ services:
     volumes:
       - .:/app
       - /app/node_modules
+    networks:
+      - shopify-mock-network
 
 volumes:
   postgres_data:
+
+networks:
+  shopify-mock-network:
+    driver: bridge
