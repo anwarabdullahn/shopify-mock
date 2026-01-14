@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { faker } from '@faker-js/faker';
 import { MockOrder, MockProduct, MockVariant, MockShop } from '../database/entities';
 
 @Injectable()
@@ -240,14 +241,47 @@ export class GraphQLService {
   private mapOrderToShopifyResponse(order: MockOrder): any {
     const shippingAddr = order.shipping_address as any || {};
     
+    // Use shipping address as billing address too (common practice)
+    const billingAddress = shippingAddr;
+    
+    // Calculate realistic pricing
+    const subtotal = order.total_price;
+    const shippingCost = faker.number.float({ min: 5, max: 50, precision: 0.01 });
+    const taxRate = faker.number.float({ min: 0.05, max: 0.25, precision: 0.01 });
+    const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
+    const discount = faker.number.float({ min: 0, max: subtotal * 0.2, precision: 0.01 });
+    const totalPrice = parseFloat((subtotal + shippingCost + taxAmount - discount).toFixed(2));
+    
     return {
       id: `gid://shopify/Order/${order.shopify_id}`,
       name: `#${order.order_number}`,
       email: order.customer_email,
-      currencyCode: 'USD', // Default currency code
+      currencyCode: 'USD',
       createdAt: order.created_at.toISOString(),
       updatedAt: order.updated_at.toISOString(),
+      processedAt: order.created_at.toISOString(),
       fulfillmentStatus: order.fulfillment_status.toUpperCase(),
+      displayFulfillmentStatus: order.fulfillment_status.toUpperCase(),
+      displayFinancialStatus: order.status.toUpperCase(),
+      note: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
+      confirmed: true,
+      cancelledAt: order.status === 'cancelled' ? order.updated_at.toISOString() : null,
+      cancelReason: order.status === 'cancelled' ? faker.helpers.arrayElement(['customer', 'fraud', 'inventory']) : null,
+      billingAddress: {
+        address1: billingAddress.address1,
+        address2: billingAddress.address2,
+        city: billingAddress.city,
+        company: billingAddress.company,
+        country: billingAddress.country,
+        countryCodeV2: billingAddress.countryCodeV2 || 'US',
+        firstName: billingAddress.firstName,
+        lastName: billingAddress.lastName,
+        name: billingAddress.name,
+        phone: billingAddress.phone,
+        province: billingAddress.province,
+        provinceCode: billingAddress.provinceCode,
+        zip: billingAddress.zip,
+      },
       lineItems: {
         edges: (order.line_items || []).map((item) => ({
           node: {
@@ -257,6 +291,20 @@ export class GraphQLService {
             sku: item.sku,
             quantity: item.quantity,
             originalPrice: item.price,
+            originalUnitPriceSet: {
+              shopMoney: {
+                amount: item.price.toString(),
+                currencyCode: 'USD',
+              },
+            },
+            name: item.title,
+            requiresShipping: true,
+            taxable: true,
+            fulfillmentStatus: 'UNFULFILLED',
+            fulfillableQuantity: item.quantity,
+            nonFulfillableQuantity: 0,
+            totalDiscount: '0.00',
+            variantTitle: `${item.title} - Variant`,
           },
         })),
       },
@@ -266,7 +314,7 @@ export class GraphQLService {
         city: shippingAddr.city,
         company: shippingAddr.company,
         country: shippingAddr.country,
-        countryCodeV2: shippingAddr.country || 'US', // Default to US if not provided
+        countryCodeV2: shippingAddr.countryCodeV2 || 'US',
         firstName: shippingAddr.firstName,
         lastName: shippingAddr.lastName,
         name: shippingAddr.name,
@@ -275,7 +323,22 @@ export class GraphQLService {
         provinceCode: shippingAddr.provinceCode,
         zip: shippingAddr.zip,
       },
-      totalPrice: order.total_price.toString(),
+      sourceName: faker.helpers.arrayElement(['web', 'mobile', 'pos', 'api']),
+      sourceIdentifier: faker.string.uuid(),
+      totalPrice: totalPrice.toString(),
+      subtotalPrice: subtotal.toString(),
+      totalTax: taxAmount.toString(),
+      totalShippingPrice: shippingCost.toString(),
+      totalDiscounts: discount.toString(),
+      totalLineItemsPrice: subtotal.toString(),
+      totalReceived: totalPrice.toString(),
+      totalRefunded: '0.00',
+      totalRefundedSet: {
+        presentmentMoney: { amount: '0.00', currencyCode: 'USD' },
+        shopMoney: { amount: '0.00', currencyCode: 'USD' },
+      },
+      unpaid: false,
+      tags: (order.metadata?.tags as string[]) || [],
       fulfillments: {
         edges: (order.fulfillments || []).map((fulfillment) => ({
           node: {
@@ -284,6 +347,13 @@ export class GraphQLService {
             trackingInfo: {
               number: fulfillment.tracking_number,
               url: fulfillment.tracking_url,
+            },
+            lineItems: {
+              nodes: (order.line_items || []).map(item => ({
+                id: `gid://shopify/LineItem/${item.id}`,
+                quantity: item.quantity,
+                sku: item.sku,
+              })),
             },
           },
         })),
