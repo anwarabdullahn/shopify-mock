@@ -43,50 +43,19 @@ export class OrderService {
       // Generate address data
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
+      const email = faker.internet.email();
+      const phone = faker.phone.number();
       const address1 = faker.location.streetAddress();
+      const address2 = faker.helpers.maybe(() => faker.location.secondaryAddress(), { probability: 0.2 }) || '';
       const city = faker.location.city();
       const province = faker.location.state({ abbreviated: true });
       const zip = faker.location.zipCode();
       const company = faker.company.name();
 
-      // Create order with complete faker data
-      const createdAt = faker.date.past();
-      const order = await this.orderRepository.save({
-        id: uuidv4(),
-        shop_id: randomShop.id,
-        shopify_id: `order-${Date.now()}`,
-        order_number: faker.number.int({ min: 1000, max: 99999 }),
-        customer_email: faker.internet.email(),
-        status: faker.helpers.arrayElement(['pending', 'confirmed', 'processing', 'cancelled', 'completed']),
-        fulfillment_status: faker.helpers.arrayElement(['unshipped', 'shipped', 'delivered', 'cancelled']),
-        shipping_address: {
-          firstName,
-          lastName,
-          address1,
-          address2: faker.helpers.maybe(() => faker.location.secondaryAddress(), { probability: 0.3 }),
-          city,
-          company,
-          country: countryCode,
-          countryCode, // Country code (2-letter)
-          countryCodeV2: countryCode, // Shopify v2 country code
-          phone: faker.phone.number(),
-          province,
-          provinceCode: province,
-          zip,
-          name: `${firstName} ${lastName}`,
-        },
-        metadata: {
-          source: faker.helpers.arrayElement(['web', 'mobile', 'api']),
-          channel: faker.helpers.arrayElement(['online_store', 'instagram', 'facebook']),
-          utm_source: faker.helpers.maybe(() => faker.lorem.word(), { probability: 0.5 }),
-          utm_campaign: faker.helpers.maybe(() => faker.lorem.word(), { probability: 0.5 }),
-        },
-        total_price: 0,
-      });
-
-      // Add random line items
+      // Add random line items first to calculate total price
       const lineItemCount = faker.number.int({ min: 1, max: 5 });
       let totalPrice = 0;
+      const lineItems = [];
 
       for (let i = 0; i < lineItemCount; i++) {
         const randomVariant = variants[Math.floor(Math.random() * variants.length)];
@@ -94,10 +63,8 @@ export class OrderService {
         const price = parseFloat(randomVariant.price.toString());
         const lineItemTotal = quantity * price;
         totalPrice += lineItemTotal;
-
-        await this.lineItemRepository.save({
+        lineItems.push({
           id: uuidv4(),
-          order_id: order.id,
           shopify_variant_id: randomVariant.shopify_id,
           title: `${randomVariant.title}`,
           sku: randomVariant.sku,
@@ -108,16 +75,52 @@ export class OrderService {
         });
       }
 
-      // Update order with total price and additional fields
-      order.total_price = parseFloat(totalPrice.toFixed(2));
-      order.metadata = {
-        ...order.metadata,
-        discount_code: faker.helpers.maybe(() => faker.random.alphaNumeric(8).toUpperCase(), { probability: 0.2 }),
-        notes: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
-        tags: faker.helpers.maybe(() => [faker.lorem.word(), faker.lorem.word()], { probability: 0.4 }),
-      };
-      
-      await this.orderRepository.save(order);
+      // Create order with complete faker data and calculated total price
+      const createdAt = faker.date.past();
+      const order = await this.orderRepository.save({
+        id: uuidv4(),
+        shop_id: randomShop.id,
+        shopify_id: `order-${Date.now()}`,
+        order_number: faker.number.int({ min: 1000, max: 99999 }),
+        customer_email: faker.internet.email(),
+        status: faker.helpers.arrayElement(['pending', 'confirmed', 'processing', 'completed']),
+        fulfillment_status: 'unshipped',
+        shipping_address: {
+          firstName,
+          lastName,
+          email,
+          address1,
+          address2,
+          city,
+          company,
+          country: countryCode,
+          countryCode, // Country code (2-letter)
+          countryCodeV2: countryCode, // Shopify v2 country code
+          phone,
+          province,
+          provinceCode: province,
+          zip,
+          name: `${firstName} ${lastName}`,
+        },
+        metadata: {
+          source: faker.helpers.arrayElement(['web', 'mobile', 'api']),
+          channel: faker.helpers.arrayElement(['online_store', 'instagram', 'facebook']),
+          utm_source: faker.helpers.maybe(() => faker.lorem.word(), { probability: 0.5 }),
+          utm_campaign: faker.helpers.maybe(() => faker.lorem.word(), { probability: 0.5 }),
+          discount_code: faker.helpers.maybe(() => faker.random.alphaNumeric(8).toUpperCase(), { probability: 0.2 }),
+          notes: faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.3 }),
+          tags: faker.helpers.maybe(() => [faker.lorem.word(), faker.lorem.word()], { probability: 0.4 }),
+        },
+        total_price: parseFloat(totalPrice.toFixed(2)),
+      });
+
+      // Save line items with order_id
+      for (const lineItem of lineItems) {
+        await this.lineItemRepository.save({
+          ...lineItem,
+          order_id: order.id,
+        });
+      }
 
       this.logger.log(
         `Created order ${order.shopify_id} #${order.order_number} for ${order.customer_email} with ${lineItemCount} line items. Total: $${order.total_price}`,

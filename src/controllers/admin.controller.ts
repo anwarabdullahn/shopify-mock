@@ -2,9 +2,9 @@ import { Controller, Post, Get, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { SeedService } from '../services/seed.service';
 import { OrderService } from '../services/order.service';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MockOrder, MockShop } from '../database/entities';
+import { MockOrder, MockShop, MockOrderLineItem, MockFulfillment } from '../database/entities';
 
 @Controller('admin')
 @ApiTags('Admin')
@@ -12,6 +12,7 @@ export class AdminController {
   constructor(
     private seedService: SeedService,
     private orderService: OrderService,
+    private dataSource: DataSource,
     @InjectRepository(MockOrder) private orderRepository: Repository<MockOrder>,
     @InjectRepository(MockShop) private shopRepository: Repository<MockShop>,
   ) {}
@@ -79,6 +80,91 @@ export class AdminController {
       relations: ['line_items', 'fulfillments'],
     });
     return { orders };
+  }
+
+  @Post('orders/create-random')
+  @ApiOperation({
+    summary: 'Create a random order',
+    description: 'Generate a new order with random faker data including customer info, address, and line items',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Order created successfully',
+    schema: {
+      example: {
+        order: {
+          id: 'uuid',
+          shopify_id: 'order-1234567890',
+          order_number: 5432,
+          customer_email: 'john.doe@example.com',
+          status: 'confirmed',
+          fulfillment_status: 'unshipped',
+          total_price: 159.97,
+          shipping_address: {
+            firstName: 'John',
+            lastName: 'Doe',
+            address1: '123 Main Street',
+            city: 'Springfield',
+            province: 'IL',
+            zip: '62701',
+            country: 'US',
+          },
+          line_items: [
+            {
+              id: 'uuid',
+              title: 'Product Name',
+              sku: 'SKU-001',
+              quantity: 2,
+              price: 29.99,
+            },
+          ],
+        },
+      },
+    },
+  })
+  async createRandomOrder(): Promise<any> {
+    const order = await this.orderService.createRandomOrder();
+    return { order };
+  }
+
+  @Post('orders/clear')
+  @ApiOperation({
+    summary: 'Clear all orders',
+    description: 'Hard delete all orders, line items, and fulfillments from the database',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Orders cleared successfully',
+    schema: {
+      example: { message: 'All orders cleared successfully' },
+    },
+  })
+  async clearOrders(): Promise<any> {
+    console.log('[CLEAR ORDERS] Endpoint called');
+    try {
+      console.log('[CLEAR ORDERS] Creating query runner');
+      const queryRunner = this.dataSource.createQueryRunner();
+      console.log('[CLEAR ORDERS] Connecting');
+      await queryRunner.connect();
+      
+      // Delete in order of foreign key constraints
+      console.log('[CLEAR ORDERS] Deleting line items');
+      await queryRunner.query('DELETE FROM mock_order_line_items');
+      console.log('[CLEAR ORDERS] Deleting fulfillments');
+      await queryRunner.query('DELETE FROM mock_fulfillments');
+      console.log('[CLEAR ORDERS] Deleting orders');
+      await queryRunner.query('DELETE FROM mock_orders');
+      
+      console.log('[CLEAR ORDERS] Releasing connection');
+      await queryRunner.release();
+      
+      console.log('[CLEAR ORDERS] Success');
+      return { message: 'All orders cleared successfully' };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[CLEAR ORDERS] ERROR:', errorMessage, error);
+      throw error;
+    }
   }
 
   @Get('orders/:id')
@@ -189,48 +275,4 @@ export class AdminController {
     return { shops };
   }
 
-  @Post('orders/create-random')
-  @ApiOperation({
-    summary: 'Create a random order',
-    description: 'Generate a new order with random faker data including customer info, address, and line items',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Order created successfully',
-    schema: {
-      example: {
-        order: {
-          id: 'uuid',
-          shopify_id: 'order-1234567890',
-          order_number: 5432,
-          customer_email: 'john.doe@example.com',
-          status: 'confirmed',
-          fulfillment_status: 'unshipped',
-          total_price: 159.97,
-          shipping_address: {
-            firstName: 'John',
-            lastName: 'Doe',
-            address1: '123 Main Street',
-            city: 'Springfield',
-            province: 'IL',
-            zip: '62701',
-            country: 'US',
-          },
-          line_items: [
-            {
-              id: 'uuid',
-              title: 'Product Name',
-              sku: 'SKU-001',
-              quantity: 2,
-              price: 29.99,
-            },
-          ],
-        },
-      },
-    },
-  })
-  async createRandomOrder(): Promise<any> {
-    const order = await this.orderService.createRandomOrder();
-    return { order };
-  }
 }

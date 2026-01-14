@@ -244,13 +244,13 @@ export class GraphQLService {
     // Use shipping address as billing address too (common practice)
     const billingAddress = shippingAddr;
     
-    // Calculate realistic pricing
-    const subtotal = order.total_price;
-    const shippingCost = faker.number.float({ min: 5, max: 50, precision: 0.01 });
-    const taxRate = faker.number.float({ min: 0.05, max: 0.25, precision: 0.01 });
+    // Use order.total_price as subtotal since it's already calculated from line items
+    const subtotal = parseFloat(order.total_price.toString());
+    const shippingCost = 10.0; // Fixed shipping cost
+    const taxRate = 0.1; // Fixed 10% tax
     const taxAmount = parseFloat((subtotal * taxRate).toFixed(2));
-    const discount = faker.number.float({ min: 0, max: subtotal * 0.2, precision: 0.01 });
-    const totalPrice = parseFloat((subtotal + shippingCost + taxAmount - discount).toFixed(2));
+    const discount = 0; // No discount for now
+    const totalPrice = parseFloat((subtotal + shippingCost + taxAmount).toFixed(2));
     
     return {
       id: `gid://shopify/Order/${order.shopify_id}`,
@@ -267,6 +267,12 @@ export class GraphQLService {
       confirmed: true,
       cancelledAt: order.status === 'cancelled' ? order.updated_at.toISOString() : null,
       cancelReason: order.status === 'cancelled' ? faker.helpers.arrayElement(['customer', 'fraud', 'inventory']) : null,
+      subtotalPrice: subtotal.toString(),
+      shippingLine: {
+        title: 'Standard Shipping',
+        price: shippingCost.toString(),
+      },
+      dutiesIncluded: false,
       billingAddress: {
         address1: billingAddress.address1,
         address2: billingAddress.address2,
@@ -323,16 +329,23 @@ export class GraphQLService {
         provinceCode: shippingAddr.provinceCode,
         zip: shippingAddr.zip,
       },
-      sourceName: faker.helpers.arrayElement(['web', 'mobile', 'pos', 'api']),
-      sourceIdentifier: faker.string.uuid(),
+      sourceName: order.metadata?.source || 'web',
+      sourceIdentifier: order.metadata?.utm_source || faker.string.uuid(),
       totalPrice: totalPrice.toString(),
-      subtotalPrice: subtotal.toString(),
       totalTax: taxAmount.toString(),
       totalShippingPrice: shippingCost.toString(),
       totalDiscounts: discount.toString(),
       totalLineItemsPrice: subtotal.toString(),
       totalReceived: totalPrice.toString(),
       totalRefunded: '0.00',
+      taxLines: [
+        {
+          title: 'Tax',
+          price: taxAmount.toString(),
+          rate: (taxRate * 100).toString(),
+          ratePercentage: (taxRate * 100).toString(),
+        },
+      ],
       totalRefundedSet: {
         presentmentMoney: { amount: '0.00', currencyCode: 'USD' },
         shopMoney: { amount: '0.00', currencyCode: 'USD' },
