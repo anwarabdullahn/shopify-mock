@@ -372,6 +372,29 @@ export class GraphQLService {
           },
         })),
       },
+      // FulfillmentOrders are required for the fulfillmentCreate mutation
+      fulfillmentOrders: {
+        edges: [
+          {
+            node: {
+              id: `gid://shopify/FulfillmentOrder/${order.shopify_id}`,
+              status: 'OPEN',
+              lineItems: {
+                nodes: (order.line_items || []).map(item => ({
+                  id: `gid://shopify/FulfillmentOrderLineItem/${item.id}`,
+                  remainingQuantity: item.quantity,
+                  lineItem: {
+                    id: `gid://shopify/LineItem/${item.id}`,
+                    quantity: item.quantity,
+                    sku: item.sku,
+                    title: item.title,
+                  },
+                })),
+              },
+            },
+          },
+        ],
+      },
     };
   }
 
