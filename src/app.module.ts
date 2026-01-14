@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { GraphQLController, AdminController } from './controllers';
+import { GraphQLController, AdminController, SimulationController } from './controllers';
 import { GraphQLService, SeedService, OrderService } from './services';
 import {
   MockShop,
@@ -38,7 +38,7 @@ import {
       MockFulfillment,
     ]),
   ],
-  controllers: [GraphQLController, AdminController],
+  controllers: [GraphQLController, AdminController, SimulationController],
   providers: [GraphQLService, SeedService, OrderService],
 })
 export class AppModule {}
