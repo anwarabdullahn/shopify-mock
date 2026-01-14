@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: shopify_mock
     ports:
-      - "5433:5432"
+       - "5511:5511"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,9 +26,9 @@ services:
       dockerfile: Dockerfile
     container_name: shopify-mock-service
     ports:
-      - "3100:3100"
+      - "3111:3111"
     environment:
-      PORT: 3100
+      PORT: 3111
       NODE_ENV: development
       DB_HOST: postgres
       DB_PORT: 5432
