@@ -308,6 +308,7 @@ export class GraphQLService {
             taxable: true,
             fulfillmentStatus: 'UNFULFILLED',
             fulfillableQuantity: item.quantity,
+            refundableQuantity: item.quantity,
             nonFulfillableQuantity: 0,
             totalDiscount: '0.00',
             variantTitle: `${item.title} - Variant`,

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { MockOrder } from './mock-order.entity';
 
 @Entity('mock_order_line_items')
@@ -31,5 +31,6 @@ export class MockOrderLineItem {
   updated_at: Date;
 
   @ManyToOne(() => MockOrder, (order) => order.line_items)
+  @JoinColumn({ name: 'order_id' })
   order: MockOrder;
 }

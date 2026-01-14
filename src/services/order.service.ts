@@ -117,8 +117,15 @@ export class OrderService {
       // Save line items with order_id
       for (const lineItem of lineItems) {
         await this.lineItemRepository.save({
-          ...lineItem,
+          id: lineItem.id,
           order_id: order.id,
+          shopify_variant_id: lineItem.shopify_variant_id,
+          title: lineItem.title,
+          sku: lineItem.sku,
+          quantity: lineItem.quantity,
+          price: lineItem.price,
+          created_at: lineItem.created_at,
+          updated_at: lineItem.updated_at,
         });
       }
 
