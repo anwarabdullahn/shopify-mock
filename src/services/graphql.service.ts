@@ -14,18 +14,33 @@ export class GraphQLService {
     @InjectRepository(MockVariant) private variantRepository: Repository<MockVariant>,
   ) {}
 
+  async getShopByToken(token: string): Promise<MockShop | null> {
+    if (!token || token === 'default') {
+      // Return the first/default shop using query builder
+      return this.shopRepository
+        .createQueryBuilder('shop')
+        .orderBy('shop.created_at', 'ASC')
+        .limit(1)
+        .getOne();
+    }
+    return this.shopRepository.findOne({ where: { access_token: token } });
+  }
+
   async handleGraphQLQuery(shopId: string, query: string, variables?: any): Promise<any> {
     this.logger.debug(`Processing GraphQL query for shop ${shopId}`);
 
-    if (query.includes('orders(first:')) {
+    // Normalize query by removing whitespace around parentheses for easier matching
+    const normalizedQuery = query.replace(/\s+/g, ' ');
+
+    if (normalizedQuery.includes('orders(')) {
       return this.getOrders(shopId, variables);
     }
 
-    if (query.includes('order(id:') || query.includes('query {')) {
-      return this.getOrder(shopId, variables);
+    if (normalizedQuery.includes('order(') || normalizedQuery.includes('query {')) {
+      return this.getOrder(shopId, query, variables);
     }
 
-    if (query.includes('productVariants')) {
+    if (normalizedQuery.includes('productVariants')) {
       return this.getProductVariants(shopId, variables);
     }
 
@@ -47,18 +62,24 @@ export class GraphQLService {
   }
 
   private async getOrders(shopId: string, variables?: any): Promise<any> {
-    const first = variables?.first || 10;
+    const first = variables?.first || 100;
     const after = variables?.after;
 
-    const query = this.orderRepository
+    const queryBuilder = this.orderRepository
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.line_items', 'line_items')
+      .leftJoinAndSelect('order.fulfillments', 'fulfillments')
       .where('order.shop_id = :shopId', { shopId })
-      .andWhere('order.fulfillment_status = :status', { status: 'unshipped' })
       .orderBy('order.created_at', 'DESC')
       .take(first);
 
-    const [orders, total] = await query.getManyAndCount();
+    // Filter by fulfillment status if specified
+    const fulfillmentStatus = variables?.fulfillment_status || 'unshipped';
+    if (fulfillmentStatus) {
+      queryBuilder.andWhere('order.fulfillment_status = :status', { status: fulfillmentStatus });
+    }
+
+    const [orders, total] = await queryBuilder.getManyAndCount();
 
     return {
       data: {
@@ -76,8 +97,23 @@ export class GraphQLService {
     };
   }
 
-  private async getOrder(shopId: string, variables?: any): Promise<any> {
-    const orderId = variables?.id || variables?.orderId;
+  private async getOrder(shopId: string, query?: string, variables?: any): Promise<any> {
+    let orderId = variables?.id || variables?.orderId;
+    
+    // Extract order ID from the query string if variables don't have it
+    if (!orderId && query) {
+      const match = query.match(/order\(id:\s*"([^"]+)"/);
+      if (match) {
+        orderId = match[1];
+      }
+    }
+    
+    // Extract the actual order ID from gid://shopify/Order/xxx format
+    if (orderId && orderId.includes('gid://shopify/Order/')) {
+      orderId = orderId.replace('gid://shopify/Order/', '');
+    }
+    
+    this.logger.debug(`Fetching order with ID: ${orderId}`);
 
     const order = await this.orderRepository
       .createQueryBuilder('order')
@@ -202,10 +238,13 @@ export class GraphQLService {
   }
 
   private mapOrderToShopifyResponse(order: MockOrder): any {
+    const shippingAddr = order.shipping_address as any || {};
+    
     return {
       id: `gid://shopify/Order/${order.shopify_id}`,
       name: `#${order.order_number}`,
       email: order.customer_email,
+      currencyCode: 'USD', // Default currency code
       createdAt: order.created_at.toISOString(),
       updatedAt: order.updated_at.toISOString(),
       fulfillmentStatus: order.fulfillment_status.toUpperCase(),
@@ -221,7 +260,21 @@ export class GraphQLService {
           },
         })),
       },
-      shippingAddress: order.shipping_address,
+      shippingAddress: {
+        address1: shippingAddr.address1,
+        address2: shippingAddr.address2,
+        city: shippingAddr.city,
+        company: shippingAddr.company,
+        country: shippingAddr.country,
+        countryCodeV2: shippingAddr.country || 'US', // Default to US if not provided
+        firstName: shippingAddr.firstName,
+        lastName: shippingAddr.lastName,
+        name: shippingAddr.name,
+        phone: shippingAddr.phone,
+        province: shippingAddr.province,
+        provinceCode: shippingAddr.provinceCode,
+        zip: shippingAddr.zip,
+      },
       totalPrice: order.total_price.toString(),
       fulfillments: {
         edges: (order.fulfillments || []).map((fulfillment) => ({

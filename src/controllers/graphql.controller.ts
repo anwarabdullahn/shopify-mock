@@ -84,7 +84,19 @@ Supported mutations:
       throw new BadRequestException('Query is required');
     }
 
-    const shopId = 'default-shop'; // In production, extract from token
+    let shopId = 'default-shop'; // Default fallback
+    
+    // Try to extract shop from headers if available
+    // In production, you would validate the token against a real Shopify API
+    const authHeader = req.variables?.['X-Shopify-Access-Token'] || 'default';
+    
+    // For now, use the shop associated with the first shop in database
+    // In production, map the access token to the actual shop
+    const shop = await this.graphqlService.getShopByToken(authHeader);
+    if (shop) {
+      shopId = shop.id;
+    }
+    
     const query = req.query.trim();
 
     try {

@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { SeedService } from '../services/seed.service';
+import { OrderService } from '../services/order.service';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MockOrder, MockShop } from '../database/entities';
@@ -10,6 +11,7 @@ import { MockOrder, MockShop } from '../database/entities';
 export class AdminController {
   constructor(
     private seedService: SeedService,
+    private orderService: OrderService,
     @InjectRepository(MockOrder) private orderRepository: Repository<MockOrder>,
     @InjectRepository(MockShop) private shopRepository: Repository<MockShop>,
   ) {}
@@ -185,5 +187,50 @@ export class AdminController {
   async getShops(): Promise<any> {
     const shops = await this.shopRepository.find();
     return { shops };
+  }
+
+  @Post('orders/create-random')
+  @ApiOperation({
+    summary: 'Create a random order',
+    description: 'Generate a new order with random faker data including customer info, address, and line items',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Order created successfully',
+    schema: {
+      example: {
+        order: {
+          id: 'uuid',
+          shopify_id: 'order-1234567890',
+          order_number: 5432,
+          customer_email: 'john.doe@example.com',
+          status: 'confirmed',
+          fulfillment_status: 'unshipped',
+          total_price: 159.97,
+          shipping_address: {
+            firstName: 'John',
+            lastName: 'Doe',
+            address1: '123 Main Street',
+            city: 'Springfield',
+            province: 'IL',
+            zip: '62701',
+            country: 'US',
+          },
+          line_items: [
+            {
+              id: 'uuid',
+              title: 'Product Name',
+              sku: 'SKU-001',
+              quantity: 2,
+              price: 29.99,
+            },
+          ],
+        },
+      },
+    },
+  })
+  async createRandomOrder(): Promise<any> {
+    const order = await this.orderService.createRandomOrder();
+    return { order };
   }
 }
