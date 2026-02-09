@@ -87,6 +87,13 @@ export class AdminController {
     summary: 'Create a random order',
     description: 'Generate a new order with random faker data including customer info, address, and line items',
   })
+  @ApiBody({
+    schema: {
+      properties: {
+        isRandomSKU: { type: 'boolean', default: false, description: 'If true, generate random SKUs using faker. If false, use predefined SKU list.' },
+      },
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Order created successfully',
@@ -122,8 +129,8 @@ export class AdminController {
       },
     },
   })
-  async createRandomOrder(): Promise<any> {
-    const order = await this.orderService.createRandomOrder();
+  async createRandomOrder(@Body() body: { isRandomSKU?: boolean }): Promise<any> {
+    const order = await this.orderService.createRandomOrder(body?.isRandomSKU ?? false);
     return { order };
   }
 

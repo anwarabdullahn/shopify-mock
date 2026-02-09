@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { faker } from '@faker-js/faker';
 import { MockOrder, MockOrderLineItem, MockShop, MockVariant } from '../database/entities';
+import { DEFAULT_SKUS } from '../constants';
 
 @Injectable()
 export class OrderService {
@@ -16,7 +17,7 @@ export class OrderService {
     @InjectRepository(MockVariant) private variantRepository: Repository<MockVariant>,
   ) {}
 
-  async createRandomOrder(): Promise<MockOrder> {
+  async createRandomOrder(isRandomSKU = false): Promise<MockOrder> {
     try {
       // Get a random shop
       const shops = await this.shopRepository.find();
@@ -67,7 +68,9 @@ export class OrderService {
           id: uuidv4(),
           shopify_variant_id: randomVariant.shopify_id,
           title: `${randomVariant.title}`,
-          sku: randomVariant.sku,
+          sku: isRandomSKU
+            ? faker.string.alphanumeric({ length: 8, casing: 'upper' })
+            : faker.helpers.arrayElement(DEFAULT_SKUS),
           quantity,
           price,
           created_at: new Date(),

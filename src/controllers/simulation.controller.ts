@@ -25,6 +25,7 @@ export class SimulationController {
     schema: {
       properties: {
         count: { type: 'number', default: 5, description: 'Number of orders to create' },
+        isRandomSKU: { type: 'boolean', default: false, description: 'If true, generate random SKUs using faker. If false, use predefined SKU list.' },
       },
     },
   })
@@ -39,13 +40,13 @@ export class SimulationController {
       },
     },
   })
-  async createMultipleOrders(@Body() body: { count?: number }): Promise<any> {
+  async createMultipleOrders(@Body() body: { count?: number; isRandomSKU?: boolean }): Promise<any> {
     const count = body.count || 5;
     const orders = [];
 
     for (let i = 0; i < count; i++) {
       try {
-        const order = await this.orderService.createRandomOrder();
+        const order = await this.orderService.createRandomOrder(body.isRandomSKU ?? false);
         orders.push({
           id: order.id,
           shopify_id: order.shopify_id,
@@ -159,6 +160,7 @@ export class SimulationController {
     schema: {
       properties: {
         orderCount: { type: 'number', default: 3, description: 'Number of orders to create' },
+        isRandomSKU: { type: 'boolean', default: false, description: 'If true, generate random SKUs using faker. If false, use predefined SKU list.' },
       },
     },
   })
@@ -176,7 +178,7 @@ export class SimulationController {
       },
     },
   })
-  async simulateFullFlow(@Body() body: { orderCount?: number }): Promise<any> {
+  async simulateFullFlow(@Body() body: { orderCount?: number; isRandomSKU?: boolean }): Promise<any> {
     const count = body.orderCount || 3;
     
     const orders = [];
